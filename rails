@@ -1,0 +1,893 @@
+<div class="tab-content container-fluid">
+  <div id="tab-1" class="tab-pane fade in active">
+    <div class="mainbox col-md-10 col-md-offset-1 margin-top-2 margin-bottom-3" role="dialog"> 
+      <div class="panel panel-info" >
+        <div class="panel-heading">
+          <div class="panel-title" style="color:white;"><center><h4>Edit Profile</h4></center></div>
+        </div> 
+        <div style="padding-top:30px" class="panel-body" >
+          <%=render :partial=>"welcome/alerts"%>
+          <%=form_for :user,url: edit_profileAdmin_path,:html=>{:class=>"form-horizontal",:multipart => true} do |f|%>  
+          	<input type="hidden" name="user_id" value="<%=@user.id%>">
+          	<input type="hidden" name="role" value="<%=params[:role]%>">
+
+            <div class="row">     
+              <div style="margin-bottom: 15px" class="col-sm-12">
+              	<label for="fname">Full name</label>
+                <input type="text" name="first_name" id="fname" class="form-control" placeholder="Please enter first name" value="<%=@is_already.first_name%>">
+              </div>    
+            </div> 
+            <div class="row">
+              <div style="margin-bottom: 15px" class="col-sm-6">    
+                <label for="contact">Contact Number</label>                                   
+              	<input type="number" name="contact" id="contact" max="+919999999999" class="form-control" placeholder="Please enter Contact number" value="<%=@user.contact%>" size="12" disabled>    
+              </div>
+              <div style="margin-bottom: 15px" class="col-sm-6">
+                 <label for="email">Email </label>  
+              	<input type="text" class="form-control" value="<%=@is_already.email%>" name="email" id="email">    
+              </div> 
+            </div> 
+            <div class="row">
+              <div style="margin-bottom: 15px" class="col-sm-6">
+              	<label for="address">Address</label>   
+                <input type="text" name="address" id="address" class="form-control" placeholder="Please enter the address"  value="<%=@user.address%>">                                       
+              </div>
+              <div style="margin-bottom: 15px" class="col-sm-6">
+              	<label for="city">City</label>   
+                <input type="text" name="city" id="city" class="form-control" placeholder="Please enter City name" value="<%=@is_already.city%>">                                       
+              </div>
+            </div>   
+            <br>
+            <div class="form-group">
+              <div class="col-sm-6">
+                <a href='javascript:;'>
+                  <img src="<%=@is_already.image.present? ? @is_already.image : '/assets/user.png'%>" class="img-tag" width="30%" onmouseover="showXbutton(this);id="user_img "onmouseout="hideXbutton(this);">
+                  <button type="button" class="btn-tag val" style="display: none;">Hello</button>
+                  <input type="file" id='img-tag' style='position:absolute;z-index:2;top:0;left:0;filter: alpha(opacity=0);-ms-filter:"progid:DXImageTransform.Microsoft.Alpha(Opacity=0)";opacity:0;background-color:transparent;color:transparent;height: 100%;width: 100%;' name="file_source"
+                  onchange='readURL(event)'>
+                </a>
+                <br>
+                <hr>
+              </div>
+            </div> 
+            <div style="margin-top:10px" class="form-group">
+              <div class="col-sm-12 controls">
+                <%=f.button "Update user details", :class=>"btn btn-primary form-control",:id=>"add_user"%>
+                <a href="#"></a>
+              </div>
+            </div>
+          <%end%>     
+        </div>                     
+      </div>
+    </div>
+  </div>
+</div>    
+
+
+<script type="text/javascript">
+ var file = ""
+ $("#add_user").on("click", function() {
+
+
+//function checkImageType(){
+
+fileType = file['type'];
+const validImageTypes = ['image/jpg', 'image/jpeg', 'image/png'];
+
+if(($('#fname').val().trim()=="" || $('#fname').val().length > 201))
+{
+
+  swal({
+        title: "Please enter your valid name.",
+        type: "warning",
+        confirmButtonColor: "#DD6B55",
+        confirmButtonText: "Ok",
+      })
+   $('#fname').focus();
+      return false;
+}
+else if(($('#city').val().trim()=="" || $('#city').val().length > 201))
+{
+ swal({
+        title: "Please enter  valid city.",
+        type: "warning",
+        confirmButtonColor: "#DD6B55",
+        confirmButtonText: "Ok",
+      })
+   $('#city').focus();
+      return false;
+}
+else if(!validImageTypes.includes(fileType) && fileType != null) {
+// invalid file type code goes here.
+
+ swal("Warning", "Image should be jpeg/png type", "error");
+return false;
+ // $("#img-msg").css("display","block")
+}
+else{
+return true;
+}
+
+});
+
+
+      
+
+
+  function readURL(event){
+   var componentId = event.target.id
+   var getImagePath = URL.createObjectURL(event.target.files[0]);
+    $('.upload-image').css('background-image', 'url(' + getImagePath + ')');
+   $('.'+componentId).attr("src", getImagePath);
+   file = event.target.files[0]
+  }
+
+  function showXbutton(obj){
+    alert(obj.id)
+  }
+
+</script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class Api::V1::UsersController < Api::V1::LandingController
+  before_action :require_api_key ,:except=>[:admin_approve_driver,:remove_document]
+  before_action :check_for_force_update ,:except=>[:admin_approve_driver,:remove_document]
+  before_action :check_user, :only=>[:update_userTempAddress,:create_recent_place,:recent_places_list,:delete_recent_place,:update_recent_place]
+  before_action :setAppLanguage, :except=>[:admin_approve_driver,:remove_document]
+  require 'dropbox'
+
+  def update_userTempAddress
+    begin
+      address = @user.temp_addresses
+      if address.present?
+        addr = address.last
+        is_update_temp_address(addr,params[:pickup_address],params[:category_id],params[:drop_address],params[:end_lat],params[:end_lng],params[:distance],params[:time])
+        send_json_response(@loadedData["address"],"success",{address: addr})
+      else
+        send_json_response(@loadedData["address"],"not exists",{})
+      end
+    rescue Exception => e
+      begin_rescue_message("#{e.message}")
+    end
+  end
+
+  def add_support
+    begin
+      if params[:message].present?  
+        support = create_support(@user,params[:image],params[:message],@auth.role)
+        send_json_response(@loadedData["support"],"success",{:support=>support[:result].as_json})
+      else
+        params_required
+      end 
+    rescue Exception => e
+      begin_rescue_message("#{e.message}")
+    end 
+  end
+
+  def recent_places_list
+    begin
+      place = get_recent_places("recent",@user.id)
+      send_json_response(@loadedData["address"],"success",{recent_places:place[:recent_place],favourites: place[:favourite]})
+    rescue Exception => e
+      begin_rescue_message("#{e.message}")
+    end
+  end
+
+  def update_recent_place
+    begin
+      recent_place = find_place(params[:place_id])
+      if recent_place
+        recent_place.update_attributes(is_favourite: params[:is_favourite],category: params[:category])
+        send_json_response(@loadedData["add_address"],"success",{recent_place:recent_place})
+      else
+        send_json_response(@loadedData["address"],"not exists",{})
+      end
+    rescue Exception => e
+      begin_rescue_message("#{e.message}")
+    end
+  end
+
+  def delete_recent_place
+    begin
+      recent_place = find_place(params[:place_id])
+      if recent_place
+        recent_place.destroy
+        send_json_response(@loadedData["rem_address"],"success",{})
+      else
+        send_json_response(@loadedData["address"],"not exists",{})
+      end
+    rescue Exception => e
+      begin_rescue_message("#{e.message}")
+    end
+  end
+
+  def upload_driver_documents
+    begin
+      doc_status =false
+      doc_status = (params[:document_name]=="technical_control" or params[:document_name]=="drivers_license" or params[:document_name]=="rose_card" or params[:document_name]=="insurance") ? true : false
+      if doc_status
+        if params[:document_type].present? and params[:document_name].present? and params[:doc].present?
+          doc = upload_doc(params[:doc])
+          if doc["url"].present?
+            document = is_create_document(@user.id,doc["url"],params[:document_type],params[:document_name]) 
+            document[:status] ? send_json_response(@loadedData["doc_success"],"success",{document: document[:doc].as_json,document_count:@user.car_documents.count}) : send_json_response(@loadedData["inv_doc_name"],"invalid",{})
+          else
+            send_json_response(@loadedData["doc"],"invalid",{})
+          end
+        else
+          params_required
+        end
+      else
+        send_json_response(@loadedData["inv_doc_name"],"invalid",{})
+      end
+    rescue Exception => e
+      begin_rescue_message("#{e.message}")
+     end
+  end
+
+  def car_documents_list
+    send_json_response(@loadedData["doc_list"],"success",{document: document_json(@user)})
+  end
+
+  def admin_approve_driver
+    begin
+      driver = find_user(params[:id])
+      if driver
+        !driver.is_admin_approve ? driver.update_attributes(is_admin_approve: true) : driver.update_attributes(is_admin_approve: false)
+        customer_push_notification(nil,nil,driver,"Your documents are #{driver.is_admin_approve ? "approved" : "disapproved"} by admin","#{driver.is_admin_approve ? "admin_approved" : "admin_remove_document"}","Admin #{driver.is_admin_approve ? "Approved Documents" : "Disapproved Documents"}")
+        send_json_response("Driver Approved by driver","success",{})
+      else
+        send_json_response("Driver","not exists",{})
+      end
+    rescue Exception => e
+      code_response(500,"Please try again!!")
+    end
+  end
+
+  def remove_document
+    doc = find_document(params[:id])
+    currentRide = currentRides.present? ? currentRides.where(driver_id=>params[:driver_id]) : nil
+    logger.info "=====currentRide=====#{currentRide.inspect}===="
+    if doc
+      if currentRide.present?
+        send_json_response("Document can't removed, Driver has an ongoing ride","invalid",{})
+      else
+        doc.user.update_attributes(is_admin_approve: false)
+        customer_push_notification(nil,nil,doc.user,"Your document are removed by admin","admin_remove_document","Document Removed")
+        doc.destroy
+        send_json_response("Document removed successfully","success",{})
+      end
+    else
+      send_json_response("Document","not exists",{})
+    end
+  end
+
+  def last_two_recent_place  # 28/02/2019 by sachin
+    send_json_response(@loadedData["rec_place"],"success",places:get_places(@user.id))
+  end
+
+  def change_app_language
+    begin
+      if params[:app_language].present?
+        @auth.update_attributes(app_language:params[:app_language])
+        logger.info "====app_language====#{@auth.inspect}===="
+        send_json_response("#{params[:app_language]}" == 'english' ? "App language changed successfully" : "La langue de l'application a été modifiée avec succès","success",{})
+      else
+        params_required(@language)
+      end
+    rescue Exception => e
+      begin_rescue_message("#{e.message}!")
+    end
+  end
+
+  private
+  def check_user
+    user = find_user_role(@user,"user")
+    unless user
+      send_json_response("Invalid user","invalid",{})
+    end
+  end
+
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class UsersController < ApplicationController
+  before_action :require_admin_logged_in, :only=>[:edit_profile,:drivers,:driver,:users,:user,:edit]
+  before_action :require_api_key , :only=>[:profile,:edit_profile,:customer_booking_history,:driver_booking_history,:driver_history,:update_device_token,:driver_data]
+  before_action :check_for_force_update , :except=>[:edit_profileAdmin,:driver,:drivers,:users,:user,:edit,:live_chat,:driver_documents,:blocked_user]
+  before_action :check_app_language,:only=>[:signup,:is_existing_contact]
+  before_action :setAppLanguage, :only=>[:profile,:edit_profile,:customer_booking_history,:driver_booking_history,:driver_history,:update_device_token,:driver_data,:signup,:is_existing_contact]
+  
+  def signup
+    begin
+      if params[:password].present? and params[:contact].present? and params[:email].present? and params[:role].present?
+        if (params[:role] == "driver" || params[:role] == "user")
+          user = find_contact(params[:contact])   
+          if !user
+            if params[:is_contact_verified]=="true"
+              refer_code = "A_p#{params[:contact]}H#{params[:role]}l_s"
+              user = add_user(params[:full_name],params[:contact],params[:email],params[:password],params[:city],params[:file_source],refer_code,params[:role],params[:device_type],params[:device_id],params[:is_contact_verified],@lang)
+              createUserWallet(0,user[:user].id) if params[:role]=="user"
+              msg = (@lang=="english" ? "Successfully signup as #{params[:role]} !!" : "S'inscrire avec succès en tant que #{role_in_language(params[:role])}")
+              send_json_response(@loadedData["success_signup"],"created",{user: user_json_data(user[:user],user[:auth])})
+            else
+              send_json_response(@loadedData["contact_n_verified"],"unapproved",{})
+            end
+          else
+            is_already = user.auths.where(role:params[:role]).first
+            if !is_already.present?
+              if params[:is_contact_verified]=="true"
+                refer_code = "A_p#{params[:contact]}H#{params[:role]}l_s"
+                auth = add_user_auth(user,params[:password],params[:role],params[:full_name],params[:email],params[:city],params[:file_source],refer_code) #user.auths.create(:password=>params[:password],:role=>params[:role])
+                add_user_device(params[:device_id],params[:device_type],user,params[:role]) if (params[:device_type].present? and params[:device_id].present?)          
+                createUserWallet(0,user.id) if params[:role]=="user"
+                send_json_response(@loadedData["success_signup"],"created",{user: user_json_data(user,auth) } )
+              else
+                send_json_response(@loadedData["contact_n_verified"],"unapproved",{})
+              end
+            else
+              code_response(401,@loadedData["user_exists"])
+            end 
+          end
+        else
+          send_json_response(check_role_language(),"invalid",{})
+        end
+      else
+        params_required
+      end
+    rescue Exception => e
+      begin_rescue_message("#{e.message}")
+    end
+  end
+
+  def socialauth
+    begin
+      if params[:contact].present? and params[:email].present? and params[:social_media].present? and params[:social_id].present? and params[:role].present?
+        user = find_user_email(params[:email].downcase)
+        auth = user.auths.find_by_role(params[:role])
+        if !user
+          user = User.create(:first_name=>params[:full_name],:email=>params[:email].downcase,:contact=>params[:contact])
+        end
+        social = user.social_auths.where(:social_media=>params[:social_media],:social_id=>params[:social_id],:role=>params[:role]).first_or_create
+        auth = user.auths.where(:role=>params[:role]).first
+        if !auth.present?
+          auth = user.auths.create(:password=>"#{params[:social_media]}.#{params[:social_id]}",:role=>params[:role])
+        end
+        add_user_device(params[:device_id],params[:device_type],user,params[:role])  if (params[:device_type].present? and params[:device_id].present?)
+        user.ensure_authentication_token
+        user.save!
+        send_json_response("User","success",{user: user.as_json.merge(first_name:auth.first_name,email:auth.email,city:auth.city,image:auth.image,refer_code:auth.refer_code,api_key: auth.api_key,last_active_at: auth.last_active_at,:social_media=>social.social_media,:social_id=>social.social_id,:role=>social.role,status:find_userStatus(user) )})
+      else
+        params_required
+      end
+    rescue Exception => e
+      code_response(500,"Please try again!! #{e.message}")
+    end
+  end
+
+  def profile
+    begin
+      status = @auth.role=="driver" ? true : false
+      if status
+        total_rides =Ride.where("request_status = ? and driver_id = ?",true,@user.id).count
+        rating =driver_ratings(@user.id) 
+        car =Car.joins(:user).where("users.id=? and cars.status=? and cars.is_online = ?",@user,true,true).first
+        send_json_response(@loadedData["user_detail"],"success",{user: @user.as_json.merge(role: @auth.role,first_name:@auth.first_name,email:@auth.email,city:@auth.city,image:@auth.image,refer_code:@auth.refer_code,api_key: @auth.api_key,last_active_at: @auth.last_active_at,:total_rides=>total_rides,:rating=>rating.present? ? rating.round(2) : nil,:active_car_info=>car.present? ? true : false)})
+      else
+        send_json_response(@loadedData["user_detail"],"success",{user: @user.as_json.merge(role: @auth.role,first_name:@auth.first_name,email:@auth.email,city:@auth.city,image:@auth.image,refer_code:@auth.refer_code,api_key: @auth.api_key,last_active_at: @auth.last_active_at,status: find_userStatus(@user) )})
+      end
+    rescue Exception => e
+      begin_rescue_message("#{e.message}")
+    end
+  end
+
+  def edit_profile
+    begin
+      is_update = is_update_user(@auth,params[:full_name],params[:email],params[:file_source],params[:address],params[:city],params[:state],params[:country],params[:pincode])
+      is_update ? send_json_response(@loadedData["user"],"updated",{user: @user.as_json.merge(role: @auth.role,first_name:@auth.first_name,email:@auth.email,city:@auth.city,image:@auth.image,refer_code:@auth.refer_code,api_key: @auth.api_key,last_active_at: @auth.last_active_at,status: @auth.role=="user" ? find_userStatus(@user) : false )}) : send_json_response("User","bad",{})
+    rescue Exception => e
+      begin_rescue_message("#{e.message}")
+    end
+  end
+
+  def edit_profileAdmin
+    @user = find_user(params[:user_id])
+    if @user
+      auth = find_user_role(@user,params[:role])
+      is_update = is_update_user(auth,params[:first_name],params[:email],params[:file_source],params[:address],params[:city],params[:state],params[:country],params[:pincode])
+       @user.update_attributes(address:params[:address])  #sachin 18/03/2019
+      is_update ? flash[:success] = "Updated Successfully" : flash[:success] = "Not updated"
+    end
+    #redirect_back(fallback_location: "root_path")
+    role=auth.role
+    redirect_to "/#{role}s"  #by sachin
+
+
+  end
+
+  def drivers
+    @drivers = search_drivers(params[:keyword],params[:doc_status])
+    render :layout => "admin_application"
+  end
+
+  def driver 
+    @user = find_user(decode_token(params[:user_id]))
+    @cars = @user.cars.order(updated_at: "DESC").paginate(:page => params[:page], :per_page => params[:per_page])
+    @completed_rides =driver_completed_bookings(@user) 
+    @current_rides =driver_current_bookings(@user)
+    @booked_rides =driver_pending_bookings(@user)
+    @cancelled_rides=driver_cancelled_bookings(@user)
+    @monthlyEarning =EarningDataSum(@user.id,Date.current.beginning_of_month,Date.current.end_of_month)
+    @weeklyEarning =EarningDataSum(@user.id,Date.current.beginning_of_week,Date.current.end_of_week)
+    @totalEarning=totalEaringSum(@user)
+    @monthlyData =monthly_earnings_graph(@user)
+    render :layout => "admin_application"
+  end
+
+  def users
+    #@users = search_users(params[:keyword])
+    @users = search_users_status(params[:keyword],params[:status])
+    p @users
+    render :layout => "admin_application"
+  end
+
+  def user
+    @user = find_user(decode_token(params[:user_id]))
+    @completed_rides = @user ? @user.rides.where(:ride_status=>true,:is_cancel=>false).order(updated_at: "DESC").paginate(:page => params[:page], :per_page => 10) : nil
+    render :layout => "admin_application"
+  end
+
+  def edit
+    @user = find_user(decode_token(params[:user_id]))
+    @is_already = find_user_role(@user,params[:role])
+    if @is_already.present?
+      render :layout => "admin_application"
+    else
+      flash[:error]="Unauthorized access, Can't access without role !!"
+      if request.env["HTTP_REFERER"].present? and request.env["HTTP_REFERER"] != request.env["REQUEST_URI"]
+        redirect_back(fallback_location: "edit_driver_path")
+      else
+        redirect_to users_path
+      end
+    end
+  end
+
+  def customer_booking_history
+    begin
+      @bookings=customer_bookings(@user,params[:status].present? ? params[:status] : "all")
+      @result = []
+      @bookings.each do |r|
+        @result<< ride_json(r)
+      end
+      send_json_response(@loadedData["book_history"],"success",{result: @result,total_records: @bookings.count})
+    rescue Exception => e
+      begin_rescue_message("#{e.message}")
+    end
+  end
+
+  def driver_booking_history
+    begin
+      @bookings=driver_bookings(@user,params[:status].present? ? params[:status] : "all")
+      @result = []
+      @bookings.each do |r|
+        auth = r.user.auths.find_by_role("user")
+        @result<< r.as_json(except:[:updated_at,:start_time,:end_time,:otp,:car_category_id]).merge(:start_time=>r.start_time.present? ? r.start_time : nil,:end_time=>r.end_time.present? ? r.end_time : nil,:rating=>r.review.present? ? r.review.rating : nil,:total_time=>(r.start_time.present? and r.end_time.present?) ? (r.end_time-r.start_time).round(2) : nil,:round_off=>r.total_price.to_s.split(".")[1],:total_fair=>(r.total_price.to_s.split(".")[0]).to_f,:user=>r.user.as_json(except:[:created_at,:updated_at,:stripe_customer_token]).merge(role: auth.role,first_name:auth.first_name,email:auth.email,city:auth.city,image:auth.image,refer_code:auth.refer_code,api_key: auth.api_key,last_active_at: auth.last_active_at),car: r.car.as_json(except:[:created_at,:updated_at,:user_id,:car_category_id]).merge(:car_category=>r.car_category.as_json(except:[:created_at,:updated_at])) )
+      end
+      send_json_response(@loadedData["book_history"],"success",{result: @result})
+    rescue Exception => e
+      begin_rescue_message("#{e.message}")
+    end
+  end
+
+  def driver_history
+    begin
+      auth = @user.auths.find_by_role("driver")
+      total_online_time = total_online_time(@user)
+      total_offline_time = total_offline_time(@user)
+      total_rides = Ride.where(:driver_id=>@user.id).count
+      total_accepted_rides = Ride.where(:driver_id=>@user.id,:request_status=>true).count
+      total_rejected_rides = Ride.where(:driver_id=>@user.id,:is_cancel=>true).count
+      total_fare_price = Ride.where(:driver_id =>@user.id).sum(:payout)
+      send_json_response(@loadedData["driver_history"],"success",{driver: @user.as_json.merge(role: auth.role,first_name:auth.first_name,email:auth.email,city:auth.city,image:auth.image,refer_code:auth.refer_code,api_key: auth.api_key,last_active_at: auth.last_active_at,:total_online_time=>total_online_time,:total_offline_time=>total_offline_time,:total_rides=>total_rides,:accepted_rides=>total_accepted_rides,:rejected_rides=>total_rejected_rides,:total_price=>total_fare_price)})
+    rescue Exception => e
+      begin_rescue_message("#{e.message}")
+    end
+  end
+
+  def driver_data
+    begin
+      if params[:data].present?
+        case params[:data]
+        when "day"
+          graph_day_history(@user.id)
+        when "week"
+          graph_week_history(@user.id)
+        when "month"
+          graph_month_history(@user.id)
+        end
+      else
+        params_required
+      end
+    rescue Exception => e
+      begin_rescue_message("#{e.message}")
+    end
+  end
+
+  def update_device_token
+    begin
+      device = UserDevice.where(:user_id=>@user.id,:role=>@auth.role).last
+      status = device ? device.update_attributes!(:device_type=>params[:device_type],:device_id=>params[:device_id]) : UserDevice.create(:device_type=>params[:device_type],:device_id=>params[:device_id],:user_id=>@user.id,:role=>@auth.role)
+      status ? send_json_response(@loadedData["device"],"updated",{}) :send_json_response("Invalid","invalid",{})
+    rescue Exception => e
+      begin_rescue_message("#{e.message}")
+    end
+  end
+
+  def live_chat
+    render :layout => "admin_application"
+  end
+
+  def is_existing_contact
+    begin
+      user = find_contact_role(params[:contact],params[:role]).last
+      if user
+        token = Time.now.to_i
+        userAuth = user.auths
+        if userAuth
+          role = userAuth.find_by_role(params[:role])
+          if role
+            role.update_attributes(:forget_password_tokrn=>token)
+            send_json_response(@loadedData["contact"],"exists",{:securityToken=>token})
+          else
+            send_json_response(check_role_language(),"invalid",{})
+          end
+        end
+      else
+        send_json_response(@loadedData["contact"],"not exists",{})
+      end
+    rescue Exception => e
+      begin_rescue_message("#{e.message}")
+    end
+  end
+
+  def is_existing_email
+    begin
+      user = find_user_email(params[:email])
+      user ? send_json_response("User email","exists",{}) : send_json_response("User email","not exists",{})
+    rescue Exception => e
+      code_response(500,"Please try again!! #{e.message}")
+    end
+  end
+
+  def driver_documents
+    @user = find_user(decode_token(params[:id]))
+    render :layout=>"admin_application"
+  end
+
+  def blocked_user
+    user = find_user(params[:user_id])
+    if user
+      auth = user.auths.find_by_role("user")
+      status = !auth.blocked_status
+      auth.update_attributes(blocked_status:status)
+      driver_push_notification(nil,user,nil,"You are #{auth.blocked_status ? "blocked" : "unblock"} by admin, Contact to admin for further query.","user_#{auth.blocked_status ? "blocked" : "unblocked"}","#{auth.blocked_status ? "Block" : "Unblock"} User")
+    end
+    redirect_back(fallback_location: "users_path")
+  end
+
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Rails.application.routes.draw do
+
+  require 'sidekiq/web'
+  require 'sidekiq/cron/web'
+
+  root 'welcome#index'
+  
+  mount Sidekiq::Web => '/sidekiq'
+  get "admin/:id"=> 'super_admins#index', as: "admin"
+  # get "admin"=> 'super_admins#index', as: "admin"
+  post 'authentication' =>"super_admins#admin_auth"
+  get 'logout'=>"super_admins#logout"
+  get 'dashboard'=>"super_admins#dashboard"
+  get 'home'=>"super_admins#home_map" 
+
+  # settings routes
+  get "admin/settings/page"=>"settings#admin_settings", as: "admin_settings"
+  post "admin/profile/update"=>"settings#admin_update_profile"
+  post "admin/change/password"=>"settings#admin_change_password"
+  get "app/settings"=> "settings#app_version_settings",as: "app_settings"
+  post "app/update/details"=>"settings#update_app_settings",as: "update_settings"
+  post "app/service/amount"=>"settings#update_service_amount"
+
+  post "admin/bank/details"=>"settings#admin_bank_details"
+
+  get 'supports/list'=>"supports#index",as: "admin_supports_list"
+  post 'support/reply'=>"supports#reply",as: "admin_support_reply"
+  get 'support/:id/show'=>"supports#show",as: "admin_support_view"
+  get 'support/:id/resolved'=>"supports#resolved",as: "admin_support_resolved"
+  get 'support/:id/remove'=>"supports#remove",as: "admin_support_destroy"
+
+  get 'faq/list'=>"faqs#index",as: "admin_faq_list"
+  get 'faq/new'=>"faqs#new",as: "admin_faq_new"
+  post 'faq/create'=>"faqs#create",as: "admin_faq_create"
+  post 'faq/update'=>"faqs#update",as: "admin_faq_update"
+  get 'faq/:id/edit'=>"faqs#edit",as: "admin_faq_edit"
+  get 'faq/:id/remove'=>"faqs#remove",as: "admin_faq_destroy"
+
+  get "apis"=> "welcome#apis"
+  get "user/terms"=>"welcome#user_terms"
+  get "privacy/policies"=>"welcome#privacy_policies"
+
+  # For details on the DSL available within this file, see http://guides.rubyonrails.org/routing.html
+ #--------------------------------------API-------------------#
+  # routes for v1 starts
+  namespace :api,defaults: { format: 'json' } do
+    namespace :v1 do
+      # for cars
+      resources :cars
+      post "search/car"=>"cars#new_search_car"
+      post "search/car/customer"=>"cars#search_car_customer"
+      get "car/:car_id/user/:user_id"=>"cars#new_car_active"
+      post "online/offline"=>"cars#new_online_offline"
+      post "change/category"=>"cars#change_category"
+      # new logout api
+      post "logout"=>"cars#new_logout"
+      # for rides
+      post "accept/ride"=>"rides#new_accept_ride"
+      post "end/ride"=>"rides#new_end_ride"
+      post "driver/reject/request"=>"rides#new_driver_reject_request"
+      post "user/cancel/ride"=>"rides#new_user_cancel_ride"
+      post "ride/request"=>"rides#new_ride_request"
+      post "ride/request/customer"=>"rides#ride_request_customer"
+      post "change/ride/request"=>"rides#new_change_ride_request"
+      post "server/cancel/ride"=>"rides#server_cancel_ride"
+      post "ride/invoice"=>"rides#ride_invoice"
+      post "ride/later"=>"rides#ride_later"
+      post "ride/later/customer"=>"rides#ride_later_customer"
+      get "user/booked/rides"=>"rides#user_booked_rides"
+      # api for MEMANGA_EXPRESS Taxi
+      get "check/user/card"=>"rides#check_user_card"
+      get "cancel/ride/reasons"=>"rides#cancel_ride_reason",as: "cancel_ride_reason"
+      # for users routes
+      post "edit/user/details"=>"users#edit_user_details"
+      post "update/temp/address"=>"users#update_userTempAddress"
+      post "add/support"=>"users#add_support"
+      post "add/recent/place"=>"users#create_recent_place"
+      get "recent/places/list"=>"users#recent_places_list"
+      post "update/recent/place"=>"users#update_recent_place"
+      get "delete/recent/place/:place_id"=>"users#delete_recent_place"
+      post "upload/document"=>"users#upload_driver_documents"
+      get "documents/list"=>"users#car_documents_list"
+      get "admin/approve/driver/:id"=>"users#admin_approve_driver"
+      get "admin/remove/driver/:driver_id/document/:id"=>"users#remove_document"
+      # notifications routes
+      get "notification/list"=>"notifications#notification_list"
+      get "noti/status"=>"notifications#noti_status"
+      # post "notifications"=>"notifications#seen_by_user"
+      get "notification/count"=>"notifications#notification_count"      
+      # faq path
+      get "faq/list"=>"faqs#faqs_list"
+      post "driver/frequent/location" => "cars#update_car_location"
+      # transaction list
+      get "user/wallet/details"=>"transactions#user_wallet_details",as: "user_wallet_details"
+      post "add/transaction"=>"transactions#add_transaction"
+      post "transaction/assigned/user"=>"transactions#transactionAssignedToUser"
+
+      # path for supports
+      get "support/list"=>"supports#all_support_list"
+      post "ticket/view"=>"supports#ticket_view"
+      post "create/reply"=>"supports#create_reply"
+      post "support/reply/list"=>"supports#support_reply_list"
+
+      #last two recent places by sachin 28/02/2019
+      get "last_two_recent_place"=>"users#last_two_recent_place"
+      get "change/app/language/:app_language"=>"users#change_app_language"
+
+
+
+    end
+  end
+
+  post 'signup'=>"users#signup"
+  post 'profile'=>"users#profile"
+  post 'edit_profile'=>"users#edit_profile"
+  post "edit/profileAdmin"=>"users#edit_profileAdmin"
+  post 'social'=>"users#socialauth"
+  post "customer_booking_history"=>"users#customer_booking_history"
+  post "driver_booking_history"=>"users#driver_booking_history"
+  post "driver_history"=>"users#driver_history"
+
+  post "driver_data"=>"users#driver_data"
+  get "users"=>"users#users"
+  get "user/:user_id"=>"users#user",:as=>"user"
+  get "drivers"=>"users#drivers"
+  get "driver/:user_id"=>"users#driver",:as=>"driver"
+  get ":role/:user_id/edit"=>"users#edit",:as=>"edit_driver"
+  post "update/device/token"=>"users#update_device_token"
+
+  get "live/chat"=>"users#live_chat"
+  #  new apis for MEMANGA_EXPRESS Taxi
+  post "existing/contact"=>"users#is_existing_contact"
+  post "existing/email"=>"users#is_existing_email"
+  get "driver/documents/:id"=>"users#driver_documents",as: "driver_documents"
+  get "blocked/user/:user_id"=>"users#blocked_user"
+
+  # ALL THE ROUTES OF SESSIONS
+  post 'login'=>'sessions#login'
+  post 'forgot_password'=>'sessions#forgot_password'
+  post "logout"=>"sessions#logout"
+  post "change/password"=>"sessions#change_password"
+  get 'forgot/:user_id/token/:token'=>"sessions#forget_view",:as=>"forgot_view"
+  post "update/password/message"=>"sessions#update_password",:as=>"update_password"
+  
+  # ALL THE ROUTES OF CARS
+  post "car_categories"=>"cars#car_categories"
+  post "driver_active_car"=>"cars#driver_active_car"
+  post "add_category"=>"cars#add_category"
+  post "add/categoryAdmin"=>"cars#add_categoryAdmin"
+  post "estimated_cost"=>"cars#estimated_cost"
+  post 'search_car'=>'cars#search_car' 
+  post 'online_offline'=>'cars#online_offline'
+  post 'add_car_location'=>'cars#add_car_location'
+  post 'add_car'=>'cars#add_car_api'
+  post 'edit_car'=>'cars#edit_car_api'
+  post "edit/car/Admin"=>"cars#edit_carAdmin"
+  post "driver_location"=>"cars#driver_location"
+  post "driver_reached"=>"cars#driver_reached"
+  get "driver/:driver_id/cars"=>"cars#driver_cars",:as=>"driver_cars"
+  get "all_cars"=>"cars#all_cars"
+  get "all/carsAdmin"=>"cars#all_carsAdmin"
+  get "remove_car/:car_id/user/:user_id"=>"cars#remove_car",:as=>"remove_car"
+  get "remove/carAdmin/:car_id/user/:user_id"=>"cars#remove_carAdmin", as: "remove_carAdmin"
+  get "car/:id"=>"cars#edit_car",:as=>"car_edit"
+  # get "car_categories"=>"cars#car_categories"
+  get "carcategories/:id"=>"cars#remove_categories",:as=>"remove_categories"
+  get "carcategoriesAdmin/:id"=>"cars#remove_categoriesAdmin",:as=>"remove_categoriesAdmin"
+  get "edit_car_category/:id"=>"cars#edit_car_category",:as=>"edit_car_category"
+  get "car_category"=>"cars#new_car_category"
+  get "admin_all_category" => "cars#admin_car_category" 
+  get 'car_active/:car_id/user/:user_id'=>'cars#car_active'
+  get 'car/activeAdmin/:car_id/user/:user_id'=>'cars#car_activeAdmin'
+  get 'approve/car/:car_id/user/:user_id'=>"cars#approveCarAdmin"
+  # get 'car/view/:car_id'=>"cars#car",:as=>"car_show"
+  get 'car/view/:car_id'=>"cars#car",:as=>"car_show"
+  get "over_speed"=>"cars#over_speed"
+
+  # post "upload/documents"=>"cars#upload_car_documents"
+  # post "remove/document"=>"cars#remove_car_document"
+  
+  # ALL THE ROUTES OF RIDES
+  post "ride_request"=>"rides#ride_request"
+  post "driver_reject_request"=>"rides#driver_reject_request"
+  post "driver_requests"=>"rides#driver_requests"
+  post "change_ride_request"=>"rides#change_ride_request"
+  post "accept_ride"=>"rides#accept_ride"
+  post "fair_price"=>"rides#fair_price"
+  post "start_ride"=>"rides#start_ride"
+  post "start_ride_admin"=>"rides#start_ride_admin"
+  post "cancel_ride_admin"=>"rides#cancel_ride_admin"
+  post "end_ride"=>"rides#end_ride"
+  post "ride_details"=>"rides#ride_details"
+  post "unseen_requests"=>"rides#unseen_ride_request"
+  post "user_cancel_ride"=>"rides#user_cancel_ride"
+  get "current_rides"=>"rides#current_rides"
+  get "completed_rides"=>"rides#completed_rides"
+  get "booked_rides" =>"rides#booked_rides"
+  get "driver/reject/rides"=> "rides#driver_reject_rides"
+  get "cancelled_rides"=>"rides#cancelled_rides"
+  get "scheduled_rides"=>"rides#scheduled_rides"
+  get "ride/:ride_id"=>"rides#ride",:as=>"ride"
+  get "remove_ride/:ride_id"=>"rides#remove_ride",:as=>"remove_ride"
+  # new 
+  get "draw/ride/map/:id"=>"rides#draw_ride_map",:as => "draw_ride_map"
+
+  # ALL THE ROUTES OF PAYMENTS
+  post "pay/ride"=>"payments#pay_ride"
+  post "add/card"=>"payments#add_card"
+  get "get/cards"=>"payments#get_cards"
+  post "remove/card"=>"payments#remove_stripe_card"
+  post "add/bank/account"=>"payments#add_bank_account"
+  get "bank/account/list"=>"payments#bank_account_list"
+  post "remove/bank/account"=>"payments#remove_bank_account"
+  post "default/bank/account"=>"payments#default_bank_account"
+  post "default/card"=>"payments#default_card"
+  get "check/user/kyc"=>"payments#user_kyc"
+
+  get "all_cards"=>"payments#all_cards"
+  get "all_bank_accounts"=>"payments#all_bank_accounts"
+
+  get "account"=>"payments#payment",:as=>"payment"
+  post "user/cash/payment"=>"payments#userCashPayment"
+
+
+  # ALL THE ROUTES OF REVIEWS
+  post "add_rating"=>"reviews#create"
+  post "driver_rating"=>"reviews#driver_rating"
+  post "rating_history"=>"reviews#rating_history"
+  post "add/customer/rating"=>"reviews#customer_rating"
+
+  # ALL THE ROUTES OF CONTACTS
+  post "emergency_contact"=>"contacts#emergency_contact"
+  post "all_contacts"=>"contacts#all_contacts"
+  post "remove/contacts"=>"contacts#remove_contacts"
+
+  # all transactions path
+  get "all/transactions"=>"transactions#all_transactions"
+  get "driver/earnings/list"=>"transactions#driver_earnings",as: "driver_earnings"
+  get "driver/earnings/show/:id"=>"transactions#driver_earnings_show",as: "driver_earnings_show"
+
+  # all routes of cancel reasons
+  get "cancel/reason/list"=>"cancel_reasons#cancel_reason_list"
+  get 'reason/new'=>"cancel_reasons#new_cancel_reason",as: "cancel_reason_new"
+  post 'reason/create'=>"cancel_reasons#create_cancel_reason",as: "cancel_reason_create"
+  post 'reason/update'=>"cancel_reasons#update_cancel_reason",as: "cancel_reason_update"
+  get 'edit/reason/:id'=>"cancel_reasons#edit_cancel_reason",as: "cancel_reason_edit"
+  get 'reason/:id/remove'=>"cancel_reasons#remove_cancel_reason",as: "cancel_reason_destroy"
+
+
+  resources :notifications,:only=>[:index,:show]
+  get "update/notification"=>"notifications#update_notification"
+  get "admin/bulk/notifications"=>"notifications#admin_bulk_notifications"
+  get "admin/single/notification"=>"notifications#admin_single_notification"
+  post "admin/notifications"=>"notifications#admin_notifications"
+
+  get "*path" => "super_admins#index"
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
